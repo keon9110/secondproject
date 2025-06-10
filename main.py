@@ -214,3 +214,101 @@ with st.form("budget"):
     if st.form_submit_button("총 예산 계산"):
         total = sum(spot_costs.values()) + transport + food + extra
         st.success(f"총 예상 경비: ¥{total:,} 엔")
+
+import streamlit as st
+import folium
+from streamlit_folium import st_folium
+from folium import IFrame
+from datetime import datetime
+import pytz
+import requests
+from fpdf import FPDF
+
+# --- 기본 설정 ---
+TOKYO_TZ = pytz.timezone('Asia/Tokyo')
+today = datetime.now(TOKYO_TZ).strftime("%Y년 %m월 %d일 (%A)")
+st.set_page_config(page_title="도쿄 여행 가이드", layout="wide")
+st.markdown("""
+<style>
+.stApp { background-image: url('https://images.unsplash.com/photo-1586500024866-5c8a0fa2185c?auto=format&fit=crop&w=1600&q=80'); 
+         background-size: cover; background-attachment: fixed; }
+</style>
+""", unsafe_allow_html=True)
+st.title("🇯🇵 도쿄 여행 가이드")
+st.markdown(f"📅 오늘 날짜 (도쿄 기준): **{today}**")
+
+# --- 실제 날씨 API 연동 ---
+API_KEY = "YOUR_OPENWEATHERMAP_API_KEY"  # 여기 API 키를 입력하세요
+weather_url = f"https://api.openweathermap.org/data/2.5/weather?q=Tokyo,jp&units=metric&appid={API_KEY}"
+res = requests.get(weather_url).json()
+temp = res['main']['temp']
+icon = res['weather'][0]['icon']
+desc = res['weather'][0]['description']
+st.markdown(f"### 현재 날씨 in 도쿄: {temp}°C, {desc.title()}  ")
+st.image(f"http://openweathermap.org/img/wn/{icon}@2x.png", width=100)
+
+# --- 관광지 데이터 생략 (위 코드와 동일하게 유지: 15개) ---
+
+# --- 필터 ---
+categories = sorted({s["category"] for s in tourist_spots})
+selected_category = st.selectbox("🔍 관광지 카테고리", ["전체"] + categories)
+filtered_spots = tourist_spots if selected_category == "전체" else [s for s in tourist_spots if s["category"] == selected_category]
+
+# --- 지도 ---
+m = folium.Map(location=[35.6762,139.6503], zoom_start=11)
+for spot in filtered_spots:
+    html_popup = f"""..."""  # 위 코드와 동일한 popup HTML
+    iframe = IFrame(html_popup, 250, 300)
+    folium.Marker([spot["lat"], spot["lon"]], tooltip=spot["name"],
+                  popup=folium.Popup(iframe), icon=folium.Icon(color="blue")).add_to(m)
+col1, col2 = st.columns([3,1])
+with col1:
+    st.subheader("🗺️ 관광지 지도")
+    st_folium(m, width=700, height=500)
+with col2:
+    st.subheader("🌤 도쿄 날씨")
+    st.write("현재 날씨를 위에서 표시합니다.")
+
+# --- 예산 계산기 & 일정 생성 ---
+st.subheader("📌 여행 계획 & 예산 설정")
+with st.form("plan_form"):
+    selected = st.multiselect("방문할 장소 선택", [s["name"] for s in tourist_spots])
+    transport = st.number_input("교통비 (1일)", value=1000)
+    food = st.number_input("식비 (1일)", value=2000)
+    extra = st.number_input("기타 비용", value=1000)
+    costs = {name: st.number_input(f"{name} 입장료", value=1000) for name in selected}
+    submit = st.form_submit_button("일정 & 예산 생성")
+
+if submit:
+    # 자동 일정 배정
+    morning = selected[::2]
+    afternoon = selected[1::2]
+    st.markdown("### 🗓️ 자동 생성 일정")
+    st.write("**오전:**", ", ".join(morning) if morning else "없음")
+    st.write("**오후:**", ", ".join(afternoon) if afternoon else "없음")
+
+    total_cost = sum(costs.values()) + transport + food + extra
+    st.success(f"💰 총 예상 경비: ¥{total_cost:,} 엔")
+
+    # --- PDF 다운로드 준비 ---
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=16)
+    pdf.cell(0,10, "도쿄 여행 일정표", ln=True, align="C")
+    pdf.ln(5)
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0,8, f"날짜: {today}", ln=True)
+    pdf.ln(5)
+    pdf.cell(0,8, "🗓️ 오전 일정: " + (", ".join(morning) if morning else "없음"), ln=True)
+    pdf.cell(0,8, "🗓️ 오후 일정: " + (", ".join(afternoon) if afternoon else "없음"), ln=True)
+    pdf.ln(5)
+    pdf.cell(0,8, "💰 예산 상세:", ln=True)
+    for k,v in costs.items():
+        pdf.cell(0,8, f"  - {k}: ¥{v}", ln=True)
+    pdf.cell(0,8, f"  - 교통비: ¥{transport}", ln=True)
+    pdf.cell(0,8, f"  - 식비: ¥{food}", ln=True)
+    pdf.cell(0,8, f"  - 기타: ¥{extra}", ln=True)
+    pdf.cell(0,8, f"총비용: ¥{total_cost:,}", ln=True)
+
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    st.download_button("📄 PDF 다운로드", data=pdf_bytes, file_name="tokyo_trip.pdf", mime="application/pdf")
