@@ -27,9 +27,9 @@ top_10_tickers = {
 }
 
 @st.cache_data
-def fetch_all_stock_data(tickers, start, end):
+def fetch_all_stock_data(_tickers, start, end):
     result_df = pd.DataFrame()
-    for ticker in tickers:
+    for ticker in _tickers:
         try:
             data = yf.download(ticker, start=start, end=end, progress=False)
             if not data.empty:
@@ -42,7 +42,7 @@ def fetch_all_stock_data(tickers, start, end):
 
 try:
     with st.spinner("주가 데이터를 불러오는 중..."):
-        stock_data = fetch_all_stock_data(top_10_tickers.keys(), three_years_ago, today)
+        stock_data = fetch_all_stock_data(list(top_10_tickers.keys()), three_years_ago, today)
 
     if stock_data.empty:
         st.error("주가 데이터를 가져오는 데 완전히 실패했습니다.")
