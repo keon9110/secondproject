@@ -3,16 +3,15 @@ import yfinance as yf
 import pandas as pd
 import datetime as dt
 
-st.set_page_config(page_title="글로벌 시총 Top 10 기업 주가 시각화", layout="wide")
+st.set_page_config(page_title="글로벌 시총 Top 10 기업 주가 변화", layout="wide")
 
-st.title("🌐 글로벌 시총 Top 10 기업 주가 변화 (최근 3년)")
-st.markdown("데이터 출처: Yahoo Finance | 가격 기준: 일반 종가")
+st.title("📈 글로벌 시총 Top 10 기업의 주가 변화")
+st.markdown("""
+최근 **3년 간의 일반 종가** 데이터를 기반으로 시각화했습니다.  
+기업을 선택하고, 원하는 날짜 범위를 설정해 보세요.
+""")
 
-# 최근 3년간의 날짜 범위 설정
-end_date = dt.date.today()
-start_date = end_date - dt.timedelta(days=3*365)
-
-# 시가총액 기준 글로벌 Top 10 기업 (2025년 기준 추정)
+# 글로벌 시총 Top 10 기업 (2025년 기준)
 companies = {
     'Apple': 'AAPL',
     'Microsoft': 'MSFT',
@@ -26,17 +25,36 @@ companies = {
     'Eli Lilly': 'LLY'
 }
 
-# 사용자 선택
-selected_companies = st.multiselect("기업 선택:", options=list(companies.keys()), default=list(companies.keys()))
+# --- Sidebar ---
+st.sidebar.header("🔧 설정")
+selected_companies = st.sidebar.multiselect(
+    "기업 선택:",
+    options=list(companies.keys()),
+    default=list(companies.keys())
+)
 
-if selected_companies:
-    st.write(f"선택한 기업: {', '.join(selected_companies)}")
+# 날짜 범위 설정
+today = dt.date.today()
+default_start = today - dt.timedelta(days=3*365)
 
-    # 주가 데이터 다운로드
+start_date = st.sidebar.date_input("시작 날짜", value=default_start, max_value=today)
+end_date = st.sidebar.date_input("종료 날짜", value=today, max_value=today)
+
+if start_date >= end_date:
+    st.sidebar.error("시작 날짜는 종료 날짜보다 앞서야 합니다.")
+
+# --- 데이터 불러오기 및 시각화 ---
+if selected_companies and start_date < end_date:
     tickers = [companies[name] for name in selected_companies]
-    data = yf.download(tickers, start=start_date, end=end_date)['Close']  # 일반 종가 사용
 
-    # 시각화
-    st.line_chart(data)
+    with st.spinner("📡 데이터를 불러오는 중입니다..."):
+        raw_data = yf.download(tickers, start=start_date, end=end_date)['Close']
+        if isinstance(raw_data, pd.Series):
+            raw_data = raw_data.to_frame()
+
+        raw_data.dropna(how='all', inplace=True)
+
+    st.subheader("📊 주가 변화 (일반 종가 기준)")
+    st.line_chart(raw_data)
 else:
-    st.warning("하나 이상의 기업을 선택하세요.")
+    st.info("✅ 왼쪽에서 기업을 선택하고 날짜를 지정하세요.")
