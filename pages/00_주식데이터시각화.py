@@ -1,18 +1,18 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import datetime
+from datetime import datetime, timedelta
 
 st.set_page_config(layout="wide")
 
 # 날짜 설정
-today = datetime.date(2025, 6, 10)
-three_years_ago = today - datetime.timedelta(days=3 * 365)
+today = datetime(2025, 6, 10)
+three_years_ago = today - timedelta(days=3 * 365)
 
 st.title("글로벌 시총 Top 10 기업 주가 변화 (최근 3년)")
 st.subheader(f"기준일: {today.strftime('%Y년 %m월 %d일')} | 데이터 기간: {three_years_ago.strftime('%Y년 %m월 %d일')} ~ {today.strftime('%Y년 %m월 %d일')}")
 
-# BRK-A → BRK-B 로 대체
+# 티커 정의
 top_10_tickers = {
     "AAPL": "Apple Inc.",
     "MSFT": "Microsoft Corp.",
@@ -21,48 +21,46 @@ top_10_tickers = {
     "NVDA": "NVIDIA Corp.",
     "META": "Meta Platforms Inc.",
     "TSLA": "Tesla Inc.",
-    "BRK-B": "Berkshire Hathaway Inc. (Class B)",  # BRK-A는 다운로드 실패 가능
+    "BRK-B": "Berkshire Hathaway Inc. (Class B)",
     "JPM": "JPMorgan Chase & Co.",
     "XOM": "Exxon Mobil Corp."
 }
 
 @st.cache_data
-def get_stock_data(tickers, start_date, end_date):
-    data = yf.download(list(tickers.keys()), start=start_date, end=end_date, progress=False, group_by='ticker')
-    adj_close = pd.DataFrame()
-    
-    for ticker in tickers.keys():
+def fetch_all_stock_data(tickers, start, end):
+    result_df = pd.DataFrame()
+    for ticker in tickers:
         try:
-            adj_close[ticker] = data[ticker]['Adj Close']
-        except:
-            st.warning(f"데이터를 불러오는 데 실패한 티커: {ticker}")
-    
-    return adj_close
+            data = yf.download(ticker, start=start, end=end, progress=False)
+            if not data.empty:
+                result_df[ticker] = data['Adj Close']
+            else:
+                st.warning(f"데이터를 불러오는 데 실패한 티커: {ticker} (빈 데이터)")
+        except Exception as e:
+            st.warning(f"데이터를 불러오는 데 실패한 티커: {ticker} - {e}")
+    return result_df
 
 try:
     with st.spinner("주가 데이터를 불러오는 중..."):
-        df_adj_close = get_stock_data(top_10_tickers, three_years_ago, today)
+        stock_data = fetch_all_stock_data(top_10_tickers.keys(), three_years_ago, today)
 
-    if df_adj_close.empty:
-        st.warning("선택한 기간 동안의 주가 데이터를 찾을 수 없습니다. 날짜 범위를 확인해주세요.")
+    if stock_data.empty:
+        st.error("주가 데이터를 가져오는 데 완전히 실패했습니다.")
     else:
         # 정규화
-        normalized_df = df_adj_close / df_adj_close.iloc[0] * 100
-        normalized_df = normalized_df.rename(columns=top_10_tickers)
+        normalized_data = stock_data / stock_data.iloc[0] * 100
+        normalized_data.rename(columns=top_10_tickers, inplace=True)
 
-        st.line_chart(normalized_df)
+        st.line_chart(normalized_data)
 
-        st.markdown(
-            """
-            * 상위 10개 기업은 2025년 6월 10일 현재 기준(예상)으로 선정되었습니다. 실제 순위는 변동될 수 있습니다.
-            * 주가는 2022년 6월 10일 시점의 가격을 100% 기준으로 정규화하여 변화율을 나타냅니다.
-            * 데이터는 `yfinance`를 통해 제공되며, 시장 상황에 따라 지연되거나 불완전할 수 있습니다.
-            """
-        )
+        st.subheader("최근 주가 (조정 종가 기준)")
+        st.dataframe(stock_data.tail())
 
-        st.subheader("개별 기업 주가 데이터 (조정 종가)")
-        st.dataframe(df_adj_close.tail())
+        st.markdown("""
+        - 주가는 첫날 기준(2022년 6월 10일)을 100으로 정규화하여 표시됩니다.
+        - 데이터 출처: Yahoo Finance via `yfinance`
+        - 일부 티커는 데이터 불러오기 실패 가능성이 있으므로 개별 경고로 표시됩니다.
+        """)
 
 except Exception as e:
-    st.error(f"데이터를 불러오거나 시각화하는 중 오류가 발생했습니다: {e}")
-    st.warning("주식 티커를 확인하거나 인터넷 연결 상태를 확인해주세요.")
+    st.error(f"오류 발생: {e}")
