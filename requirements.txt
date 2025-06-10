@@ -1,5 +1,5 @@
-folium
-streamlit-folium
-streamlit
 yfinance
-pandas
+plotly
+folium
+koreanize_matplotlib
+streamlit-folium
