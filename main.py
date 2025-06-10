@@ -1,76 +1,103 @@
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
+from folium import IFrame
 
-# 관광지 정보 리스트
+# 페이지 기본 설정
+st.set_page_config(page_title="도쿄 관광 가이드", layout="wide")
+st.title("🇯🇵 도쿄 주요 관광지 가이드")
+st.markdown("도쿄의 명소를 지도와 함께 살펴보고, 추천 일정과 방문 팁도 확인해보세요!")
+
+# 관광지 데이터
 tourist_spots = [
     {
-        "name": "시드니 오페라 하우스",
-        "location": [-33.8568, 151.2153],
-        "description": "시드니의 아이콘인 오페라 하우스는 세계적으로 유명한 공연 예술 센터입니다. 유니크한 디자인과 항구 전망이 매력입니다.",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3e/Sydney_Opera_House_-_Dec_2008.jpg"
+        "name": "도쿄 타워",
+        "lat": 35.6586,
+        "lon": 139.7454,
+        "description": "도쿄의 상징적인 랜드마크로, 전망대에서 야경이 특히 아름답습니다.",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Tokyo_Tower_and_around_Skyscrapers.jpg",
+        "time": "일몰 후~밤 9시",
+        "transport": "도에이 오에도선 '아카반바시 역' 도보 5분"
     },
     {
-        "name": "그레이트 배리어 리프",
-        "location": [-18.2871, 147.6992],
-        "description": "세계 최대 산호초 지대로, 다이빙과 스노클링의 성지입니다. 유네스코 세계유산에도 등재되어 있어요.",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6e/Great_Barrier_Reef_-_Flickr_-_eutrophication_%26_hypoxia_%281%29.jpg"
+        "name": "센소지",
+        "lat": 35.7148,
+        "lon": 139.7967,
+        "description": "도쿄에서 가장 오래된 절로, 전통적인 분위기와 쇼핑을 동시에 즐길 수 있습니다.",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Sensoji_-_Thunder_Gate_-_2020.jpg",
+        "time": "오전 9시~오후 5시",
+        "transport": "지하철 긴자선 '아사쿠사 역' 도보 2분"
     },
     {
-        "name": "울룰루 (에어즈 록)",
-        "location": [-25.3444, 131.0369],
-        "description": "호주의 붉은 심장부에 위치한 거대한 바위산으로, 원주민 문화의 성지이자 장엄한 일몰로 유명합니다.",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Uluru_Ayers_Rock_Red_Centre_Australia.jpg"
+        "name": "시부야 스크램블 교차로",
+        "lat": 35.6595,
+        "lon": 139.7005,
+        "description": "수백 명의 사람들이 동시에 건너는 도쿄의 상징적인 거리 풍경입니다.",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/5/54/Shibuya_Crossing.jpg",
+        "time": "해 질 무렵 ~ 밤",
+        "transport": "JR 야마노테선 '시부야 역' 바로 앞"
     },
     {
-        "name": "멜버른",
-        "location": [-37.8136, 144.9631],
-        "description": "예술과 커피의 도시 멜버른은 세련된 골목길, 트램 문화, 그리고 다양한 축제로 유명합니다.",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Melbourne_City_Skyline_Australia.jpg"
+        "name": "메이지 신궁",
+        "lat": 35.6764,
+        "lon": 139.6993,
+        "description": "도심 속 숲에 둘러싸인 조용한 신사로, 산책과 참배에 적합한 장소입니다.",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Meiji_Shrine_main_building.JPG",
+        "time": "아침 일찍 ~ 정오",
+        "transport": "JR 야마노테선 '하라주쿠 역' 도보 2분"
     },
     {
-        "name": "타즈마니아 크레이들 마운틴",
-        "location": [-41.6836, 145.9378],
-        "description": "웅장한 산과 맑은 호수, 다양한 야생동물을 만날 수 있는 트레킹 명소입니다.",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6e/Cradle_Mountain_-_November_2007.jpg"
+        "name": "도쿄 스카이트리",
+        "lat": 35.7100,
+        "lon": 139.8107,
+        "description": "일본에서 가장 높은 전망대로, 도쿄 전경을 한눈에 볼 수 있습니다.",
+        "image": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Tokyo_Skytree_2014_%28cropped%29.jpg",
+        "time": "오후 4시~일몰 이후",
+        "transport": "도쿄 스카이트리역 도보 1분"
     },
-    {
-        "name": "골드 코스트",
-        "location": [-28.0167, 153.4000],
-        "description": "반짝이는 해변과 끝없는 서핑 파도, 테마파크로 가득한 가족 여행 명소입니다.",
-        "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Gold_Coast_Q1_building.jpg"
-    }
 ]
 
-st.set_page_config(page_title="호주 관광 가이드", layout="wide")
-st.title("🇦🇺 호주의 주요 관광지 가이드")
-st.write("호주의 아름답고 다양한 관광 명소를 소개합니다. 지도를 클릭하거나 아래 설명을 확인해보세요!")
-
-# Folium 지도 생성
-m = folium.Map(location=[-25.0, 133.0], zoom_start=4)
+# 지도 생성
+tokyo_center = [35.6762, 139.6503]
+m = folium.Map(location=tokyo_center, zoom_start=12)
 
 # 마커 추가
 for spot in tourist_spots:
-    popup_html = f"""
-    <b>{spot['name']}</b><br>
-    <img src="{spot['image_url']}" width="200"><br>
+    html = f"""
+    <h4>{spot['name']}</h4>
+    <img src="{spot['image']}" width="200"><br>
+    <b>추천 시간:</b> {spot['time']}<br>
+    <b>교통:</b> {spot['transport']}<br>
     <p>{spot['description']}</p>
     """
+    iframe = IFrame(html, width=250, height=300)
+    popup = folium.Popup(iframe, max_width=250)
     folium.Marker(
-        location=spot['location'],
-        popup=folium.Popup(popup_html, max_width=300),
-        tooltip=spot['name'],
+        location=[spot["lat"], spot["lon"]],
+        popup=popup,
+        tooltip=spot["name"],
         icon=folium.Icon(color="blue", icon="info-sign")
     ).add_to(m)
 
-# Folium 지도 출력
-st.subheader("📍 관광지 위치 지도")
-st_data = st_folium(m, width=1000, height=600)
+# 지도 출력
+st.subheader("🗺️ 도쿄 관광지 위치 지도")
+st_data = st_folium(m, width=800, height=500)
 
-# 관광지 설명
-st.subheader("🌟 상세 가이드")
+# 관광지 목록과 설명
+st.subheader("📌 관광지 상세 가이드")
 for spot in tourist_spots:
     st.markdown(f"### {spot['name']}")
-    st.image(spot["image_url"], width=600)
+    st.image(spot["image"], use_column_width=True)
+    st.markdown(f"**추천 방문 시간:** {spot['time']}")
+    st.markdown(f"**대중교통:** {spot['transport']}")
     st.write(spot["description"])
     st.markdown("---")
+
+# 추천 일정
+st.subheader("📅 추천 1일 여행 코스 예시")
+st.markdown("""
+- **오전:** 메이지 신궁 → 시부야 스크램블 교차로  
+- **점심:** 시부야 근처 라멘 또는 회전초밥  
+- **오후:** 센소지와 나카미세 거리 산책  
+- **저녁:** 도쿄 타워 전망대 또는 도쿄 스카이트리 야경 감상  
+""")
