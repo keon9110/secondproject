@@ -104,3 +104,11 @@ else:  # 캔들스틱 차트
         template="plotly_white"
     )
     st.plotly_chart(fig, use_container_width=True)
+
+st.write("### 데이터프레임 정보")
+st.write(all_data.info())
+st.write(all_data.head())
+
+if price_type not in all_data.columns:
+    st.error(f"'{price_type}' 컬럼이 데이터에 없습니다.")
+    st.stop()
