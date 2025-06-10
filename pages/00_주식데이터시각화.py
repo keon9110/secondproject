@@ -1,60 +1,83 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import datetime as dt
+from datetime import datetime, timedelta
 
-st.set_page_config(page_title="글로벌 시총 Top 10 기업 주가 변화", layout="wide")
+# 다크모드용 커스텀 CSS 삽입
+dark_mode_css = """
+<style>
+    /* 배경 다크모드 */
+    .main {
+        background-color: #0e1117;
+        color: #d7d7d7;
+    }
+    /* 헤더 색상 */
+    header, .css-18e3th9 {
+        background-color: #0e1117;
+    }
+    /* 차트 배경 */
+    .stLineChart > div > div > svg {
+        background-color: #0e1117 !important;
+    }
+    /* 텍스트 색상 */
+    .css-1d391kg, .css-1d391kg span {
+        color: #d7d7d7;
+    }
+    /* 선택 박스 배경/글자 색상 */
+    div[role="listbox"] {
+        background-color: #22272e;
+        color: #d7d7d7;
+    }
+    /* 스크롤바 색상 */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background-color: #555;
+        border-radius: 4px;
+    }
+</style>
+"""
 
-st.title("📈 글로벌 시총 Top 10 기업의 주가 변화")
-st.markdown("""
-최근 **3년 간의 일반 종가** 데이터를 기반으로 시각화했습니다.  
-기업을 선택하고, 원하는 날짜 범위를 설정해 보세요.
-""")
+st.markdown(dark_mode_css, unsafe_allow_html=True)
 
-# 글로벌 시총 Top 10 기업 (2025년 기준)
+st.title("📊 글로벌 시가총액 Top 10 기업 - 최근 3년 주가 변화 (Dark Mode)")
+
 companies = {
-    'Apple': 'AAPL',
-    'Microsoft': 'MSFT',
-    'Saudi Aramco': '2222.SR',
-    'Nvidia': 'NVDA',
-    'Alphabet (Google)': 'GOOGL',
-    'Amazon': 'AMZN',
-    'Meta Platforms': 'META',
-    'Berkshire Hathaway': 'BRK-B',
-    'TSMC': 'TSM',
-    'Eli Lilly': 'LLY'
+    "Apple": "AAPL",
+    "Microsoft": "MSFT",
+    "Saudi Aramco": "2222.SR",
+    "Alphabet (Google)": "GOOG",
+    "Amazon": "AMZN",
+    "Nvidia": "NVDA",
+    "Berkshire Hathaway": "BRK-B",
+    "Meta Platforms": "META",
+    "Tesla": "TSLA",
+    "TSMC": "TSM"
 }
 
-# --- Sidebar ---
-st.sidebar.header("🔧 설정")
-selected_companies = st.sidebar.multiselect(
-    "기업 선택:",
-    options=list(companies.keys()),
-    default=list(companies.keys())
-)
+end_date = datetime.today()
+start_date = end_date - timedelta(days=3*365)
 
-# 날짜 범위 설정
-today = dt.date.today()
-default_start = today - dt.timedelta(days=3*365)
+selected_companies = st.multiselect("기업 선택", options=list(companies.keys()), default=list(companies.keys())[:5])
 
-start_date = st.sidebar.date_input("시작 날짜", value=default_start, max_value=today)
-end_date = st.sidebar.date_input("종료 날짜", value=today, max_value=today)
+if selected_companies:
+    st.write(f"📅 기간: {start_date.date()} ~ {end_date.date()}")
+    all_data = pd.DataFrame()
 
-if start_date >= end_date:
-    st.sidebar.error("시작 날짜는 종료 날짜보다 앞서야 합니다.")
+    for name in selected_companies:
+        ticker = companies[name]
+        try:
+            df = yf.download(ticker, start=start_date, end=end_date)
+            df = df[['Adj Close']].rename(columns={"Adj Close": name})
+            if all_data.empty:
+                all_data = df
+            else:
+                all_data = all_data.join(df, how="outer")
+        except Exception as e:
+            st.warning(f"{name}의 데이터를 불러오는 데 실패했습니다. 오류: {e}")
 
-# --- 데이터 불러오기 및 시각화 ---
-if selected_companies and start_date < end_date:
-    tickers = [companies[name] for name in selected_companies]
-
-    with st.spinner("📡 데이터를 불러오는 중입니다..."):
-        raw_data = yf.download(tickers, start=start_date, end=end_date)['Close']
-        if isinstance(raw_data, pd.Series):
-            raw_data = raw_data.to_frame()
-
-        raw_data.dropna(how='all', inplace=True)
-
-    st.subheader("📊 주가 변화 (일반 종가 기준)")
-    st.line_chart(raw_data)
+    all_data.dropna(inplace=True)
+    st.line_chart(all_data)
 else:
-    st.info("✅ 왼쪽에서 기업을 선택하고 날짜를 지정하세요.")
+    st.info("시각화할 기업을 하나 이상 선택하세요.")
