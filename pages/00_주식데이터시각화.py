@@ -75,20 +75,63 @@ chart_type = st.sidebar.selectbox(
 # --- 본문 영역: 데이터 처리 및 그래프 출력 ---
 st.markdown("---")
 
+# **MODIFIED DATA DOWNLOAD LOGIC**
 with st.spinner("선택하신 기간과 기업의 주가 데이터를 다운로드 중입니다..."):
-    all_data = pd.DataFrame()
-    for ticker in selected_tickers:
-        try:
-            df = yf.download(ticker, start=start_date, end=end_date)
-            if df.empty:
-                st.warning(f"**{ticker_names[ticker]} ({ticker})**: 선택하신 기간에 데이터가 없습니다.")
-                continue
-            df = df.reset_index()
-            df["Ticker"] = ticker # 어떤 기업의 데이터인지 식별할 수 있도록 'Ticker' 컬럼 추가
-            all_data = pd.concat([all_data, df])
-        except Exception as e:
-            st.error(f"**{ticker_names[ticker]} ({ticker})** 데이터 다운로드 중 오류가 발생했습니다: {e}")
-            continue
+    # Use yf.download to get data for multiple tickers at once
+    # This automatically handles the columns correctly, usually with a MultiIndex
+    try:
+        # download multiple tickers at once. This returns a MultiIndex DataFrame
+        # where the first level is the metric (Close, High, etc.) and the second is the ticker.
+        data_yf = yf.download(selected_tickers, start=start_date, end=end_date)
+        
+        if data_yf.empty:
+            st.warning("선택하신 기간에 데이터가 없습니다. 날짜 범위나 기업을 다시 확인해 주세요.")
+            st.stop()
+
+        # To prepare for Plotly Express's 'long' format, we need to melt the DataFrame.
+        # First, ensure 'Date' is a column, not index.
+        data_yf = data_yf.reset_index()
+
+        # Melt the DataFrame to long format
+        # id_vars: columns to keep as identifiers
+        # var_name: name for the new column holding the old column names (e.g., 'Close', 'High')
+        # value_name: name for the new column holding the actual values
+        # The columns are MultiIndex, so we need to flatten them first if not using specific levels
+        # A common way to flatten MultiIndex columns is to create a new list of strings
+        
+        # Flatten MultiIndex columns to single strings, e.g., 'Close_AAPL', 'High_MSFT'
+        # Or, ideally, prepare for melting.
+        
+        # Let's pivot slightly differently to get Tickers as top level columns easily
+        # We want 'Date', 'Ticker', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'
+        
+        # Method 1: Using stack() to get long format (more robust for multiple tickers)
+        # stack() converts the innermost level of column labels into part of the index.
+        # This will give us a DataFrame with an outer index of Date and an inner index of the metric,
+        # and then columns of the ticker. We then unstack the ticker and melt again.
+        
+        # Simpler approach: Iterate and concat, then melt
+        all_data_list = []
+        for ticker in selected_tickers:
+            # yf.download when called with a single ticker already returns flat columns
+            df_single = yf.download(ticker, start=start_date, end=end_date)
+            if not df_single.empty:
+                df_single = df_single.reset_index()
+                df_single["Ticker"] = ticker
+                all_data_list.append(df_single)
+        
+        if not all_data_list:
+            st.warning("선택하신 기간에 데이터가 없습니다. 날짜 범위나 기업을 다시 확인해 주세요.")
+            st.stop()
+
+        # Concatenate all single-ticker dataframes
+        # This results in 'Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'Ticker'
+        # Which is the perfect 'long' format for Plotly Express
+        all_data = pd.concat(all_data_list, ignore_index=True)
+
+    except Exception as e:
+        st.error(f"데이터 다운로드 또는 처리 중 오류가 발생했습니다: {e}")
+        st.stop()
 
 # --- DEBUGGING SECTION ---
 st.subheader("🛠️ 디버깅 정보 (개발 시에만 보임)")
@@ -108,7 +151,7 @@ st.write("-----------------------------")
 # --- END DEBUGGING SECTION ---
 
 
-if all_data.empty:
+if all_data.empty: # This check is now redundant if the above `if not all_data_list` handles it, but good to keep
     st.warning("선택한 조건에 맞는 데이터가 없습니다. 날짜 범위나 기업을 다시 확인해 주세요.")
     st.stop()
 
@@ -157,6 +200,7 @@ else:  # 캔들스틱 차트
         st.stop()
 
     # 단일 기업 선택 시 캔들스틱 차트 생성
+    # We still need to filter for the single selected ticker here
     selected_ticker_df = all_data[all_data["Ticker"] == selected_tickers[0]]
 
     # Ensure Date column is datetime type
