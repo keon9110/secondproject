@@ -90,6 +90,24 @@ with st.spinner("선택하신 기간과 기업의 주가 데이터를 다운로�
             st.error(f"**{ticker_names[ticker]} ({ticker})** 데이터 다운로드 중 오류가 발생했습니다: {e}")
             continue
 
+# --- DEBUGGING SECTION ---
+st.subheader("🛠️ 디버깅 정보 (개발 시에만 보임)")
+st.write(f"selected_tickers: {selected_tickers}")
+st.write(f"price_type: {price_type}")
+st.write(f"chart_type: {chart_type}")
+st.write("--- all_data DataFrame 정보 ---")
+st.write(f"all_data.empty: {all_data.empty}")
+if not all_data.empty:
+    st.write(f"all_data.shape: {all_data.shape}")
+    st.write(f"all_data.columns: {all_data.columns.tolist()}")
+    st.dataframe(all_data.head()) # Show first few rows
+    st.dataframe(all_data.tail()) # Show last few rows
+else:
+    st.write("all_data DataFrame is empty after download.")
+st.write("-----------------------------")
+# --- END DEBUGGING SECTION ---
+
+
 if all_data.empty:
     st.warning("선택한 조건에 맞는 데이터가 없습니다. 날짜 범위나 기업을 다시 확인해 주세요.")
     st.stop()
@@ -104,6 +122,15 @@ if price_type not in all_data.columns:
 
 if chart_type == "선 그래프":
     # Plotly Express를 사용하여 선 그래프 생성
+    # Check if 'Date' column is datetime type, if not, convert it
+    if 'Date' in all_data.columns and not pd.api.types.is_datetime64_any_dtype(all_data['Date']):
+        st.warning("Date 컬럼이 datetime 타입이 아닙니다. 변환을 시도합니다.")
+        try:
+            all_data['Date'] = pd.to_datetime(all_data['Date'])
+        except Exception as e:
+            st.error(f"Date 컬럼을 datetime으로 변환하는 데 실패했습니다: {e}")
+            st.stop()
+
     fig = px.line(
         all_data,
         x="Date",
@@ -131,6 +158,16 @@ else:  # 캔들스틱 차트
 
     # 단일 기업 선택 시 캔들스틱 차트 생성
     selected_ticker_df = all_data[all_data["Ticker"] == selected_tickers[0]]
+
+    # Ensure Date column is datetime type
+    if 'Date' in selected_ticker_df.columns and not pd.api.types.is_datetime64_any_dtype(selected_ticker_df['Date']):
+        st.warning("캔들스틱 차트: Date 컬럼이 datetime 타입이 아닙니다. 변환을 시도합니다.")
+        try:
+            selected_ticker_df['Date'] = pd.to_datetime(selected_ticker_df['Date'])
+        except Exception as e:
+            st.error(f"캔들스틱 차트: Date 컬럼을 datetime으로 변환하는 데 실패했습니다: {e}")
+            st.stop()
+
 
     # 캔들스틱 차트는 Open, High, Low, Close가 반드시 필요
     required_cols = ["Open", "High", "Low", "Close"]
